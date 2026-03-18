@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How We Set Up SSO with Azure AD</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6f8; padding: 2rem 1rem; }
+  .wrap { max-width: 860px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 2rem 2.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+  .title { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #6b7280; margin-bottom: 1.5rem; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .tab { padding: 7px 16px; font-size: 13px; font-weight: 500; border: 1.5px solid #d1d5db; border-radius: 20px; cursor: pointer; background: #ffffff; color: #4b5563; transition: all .15s; }
+  .tab:hover { border-color: #3b82f6; color: #3b82f6; }
+  .tab.active { background: #3b82f6; color: #ffffff; border-color: #3b82f6; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Flow */
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0; margin-bottom: 1.25rem; }
+  .fbox { background: #f3f4f6; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 10px 14px; text-align: center; min-width: 95px; }
+  .fbox .label { font-weight: 600; color: #1f2937; font-size: 13px; }
+  .fbox .desc { color: #6b7280; font-size: 11px; margin-top: 2px; }
+  .fbox.highlight { background: #eff6ff; border-color: #93c5fd; }
+  .fbox.highlight .label { color: #1d4ed8; }
+  .arr { font-size: 18px; color: #9ca3af; padding: 0 4px; }
+  .flow-note { font-size: 13px; color: #4b5563; line-height: 1.7; }
+
+  /* Code */
+  .code-wrap { position: relative; margin: 0.75rem 0; }
+  pre { background: #1e1e2e; border-radius: 10px; padding: 1.25rem 1.5rem; font-family: 'Fira Code', 'Cascadia Code', 'Courier New', monospace; font-size: 12.5px; line-height: 1.7; overflow-x: auto; color: #cdd6f4; }
+  .kw { color: #cba6f7; } .str { color: #a6e3a1; } .prop { color: #89b4fa; } .cmt { color: #6c7086; }
+  .copy-btn { position: absolute; top: 10px; right: 10px; font-size: 11px; padding: 4px 10px; border: 1px solid #4a4a6a; border-radius: 6px; background: #2a2a3e; color: #cdd6f4; cursor: pointer; transition: background .15s; }
+  .copy-btn:hover { background: #3a3a5e; }
+
+  /* Checklist */
+  .checklist { display: flex; flex-direction: column; gap: 10px; }
+  .ci { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1.5px solid #e5e7eb; border-radius: 10px; background: #f9fafb; }
+  .ci .icon { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .ci .icon.done { background: #d1fae5; color: #065f46; }
+  .ci .icon.warn { background: #fef3c7; color: #92400e; }
+  .ci-text .head { font-size: 13px; font-weight: 600; color: #1f2937; }
+  .ci-text .note { font-size: 12px; color: #6b7280; margin-top: 3px; line-height: 1.5; }
+  .cfg { display: inline-block; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 5px; padding: 1px 7px; font-family: monospace; font-size: 11px; color: #1d4ed8; margin: 0 2px; }
+
+  /* Gotchas */
+  .gotcha-grid { display: flex; flex-direction: column; gap: 12px; }
+  .gcard { border-radius: 10px; padding: 16px 18px; display: flex; gap: 14px; align-items: flex-start; }
+  .gcard.blue  { background: #eff6ff; border: 1.5px solid #93c5fd; }
+  .gcard.story { background: #fffbeb; border: 1.5px solid #fcd34d; }
+  .badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; flex-shrink: 0; margin-top: 2px; letter-spacing: 0.03em; }
+  .badge.org   { background: #dbeafe; color: #1e40af; }
+  .badge.story { background: #fef3c7; color: #92400e; }
+  .gcard-body .gh { font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }
+  .gcard-body .gb { font-size: 13px; color: #4b5563; line-height: 1.7; }
+  .team-quote { font-size: 13px; font-style: italic; color: #374151; border-left: 4px solid #f59e0b; padding: 8px 14px; margin: 8px 0 12px; background: #ffffff; border-radius: 0 8px 8px 0; }
+  .url-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .url-pill { font-family: monospace; font-size: 12px; padding: 4px 12px; border-radius: 99px; font-weight: 500; }
+  .url-pill.ok  { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+  .url-pill.bad { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; text-decoration: line-through; }
+  .resolution { margin-top: 14px; padding-top: 12px; border-top: 1.5px solid #fcd34d; }
+  .resolution .rl { font-size: 11px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .resolution .rb { font-size: 13px; color: #4b5563; line-height: 1.6; }
+
+  /* Why grid */
+  .why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .wcard { padding: 14px 16px; border: 1.5px solid #e5e7eb; border-radius: 10px; background: #f9fafb; }
+  .wcard .wh { font-size: 13px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }
+  .wcard .wb { font-size: 12px; color: #6b7280; line-height: 1.6; }
+  @media (max-width: 560px) { .why-grid { grid-template-columns: 1fr; } .flow { gap: 4px; } }
+
+  /* Accent bar on top */
+  .accent-bar { height: 5px; background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4); border-radius: 12px 12px 0 0; margin: -2rem -2.5rem 2rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="accent-bar"></div>
+
+  <p class="title">How We Set Up SSO with Azure AD</p>
+  <p class="sub">React SPA + Spring Boot backend &nbsp;·&nbsp; Our org's Azure AD</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="show('flow', this)">Auth flow</button>
+    <button class="tab" onclick="show('frontend', this)">Frontend</button>
+    <button class="tab" onclick="show('backend', this)">Backend config</button>
+    <button class="tab" onclick="show('checklist', this)">Setup steps</button>
+    <button class="tab" onclick="show('gotchas', this)">Gotchas</button>
+    <button class="tab" onclick="show('why', this)">Why this way</button>
+  </div>
+
+  <!-- FLOW -->
+  <div class="panel active" id="p-flow">
+    <div class="flow">
+      <div class="fbox"><div class="label">User</div><div class="desc">Opens app</div></div>
+      <div class="arr">→</div>
+      <div class="fbox highlight"><div class="label">React SPA</div><div class="desc">MsalProvider</div></div>
+      <div class="arr">→</div>
+      <div class="fbox"><div class="label">Azure AD</div><div class="desc">Our org tenant</div></div>
+      <div class="arr">→</div>
+      <div class="fbox highlight"><div class="label">ID Token</div><div class="desc">JWT returned</div></div>
+      <div class="arr">→</div>
+      <div class="fbox"><div class="label">Spring Boot</div><div class="desc">Validates token</div></div>
+      <div class="arr">→</div>
+      <div class="fbox"><div class="label">MS Graph</div><div class="desc">User &amp; groups</div></div>
+    </div>
+    <p class="flow-note">Because we use <strong>our organisation's Azure AD</strong>, users sign in with their existing work accounts — no separate credentials. Azure already knows who they are. The backend uses the client secret to call Microsoft Graph and pull user/group data from our directory.</p>
+  </div>
+
+  <!-- FRONTEND -->
+  <div class="panel" id="p-frontend">
+    <p style="font-size:13px;color:#4b5563;margin-bottom:12px">Wrap your app root with <code style="font-family:monospace;font-size:12px;background:#f3f4f6;padding:2px 6px;border-radius:4px">MsalProvider</code> — that's it for plumbing.</p>
+    <div class="code-wrap">
+      <button class="copy-btn" onclick="copyCode(this, 0)">Copy</button>
+<pre><span class="kw">import</span> { PublicClientApplication } <span class="kw">from</span> <span class="str">'@azure/msal-browser'</span>;
+<span class="kw">import</span> { MsalProvider } <span class="kw">from</span> <span class="str">'@azure/msal-react'</span>;
+
+<span class="kw">const</span> msalInstance = <span class="kw">new</span> PublicClientApplication({
+  auth: {
+    <span class="prop">clientId</span>: <span class="str">'YOUR_CLIENT_ID'</span>,
+    <span class="prop">authority</span>: <span class="str">'https://login.microsoftonline.com/YOUR_TENANT_ID'</span>,
+    <span class="prop">redirectUri</span>: window.location.origin,
+  }
+});
+
+<span class="kw">export default function</span> App() {
+  <span class="kw">return</span> (
+    &lt;MsalProvider instance={msalInstance}&gt;
+      &lt;YourApp /&gt;
+    &lt;/MsalProvider&gt;
+  );
+}</pre>
+    </div>
+    <p style="font-size:13px;color:#4b5563;margin-top:10px">Then anywhere inside: <code style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px">useMsal()</code> / <code style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px">useIsAuthenticated()</code> hooks just work.</p>
+  </div>
+
+  <!-- BACKEND -->
+  <div class="panel" id="p-backend">
+    <p style="font-size:13px;color:#4b5563;margin-bottom:12px">Spring Boot properties — the client secret <strong>never touches the frontend</strong>.</p>
+    <div class="code-wrap">
+      <button class="copy-btn" onclick="copyCode(this, 1)">Copy</button>
+<pre><span class="prop">graph.client-id</span>=<span class="str">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</span>
+<span class="prop">graph.client-secret</span>=<span class="str">your-secret-here</span>
+<span class="prop">graph.tenant-id</span>=<span class="str">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</span>
+<span class="prop">graph.scope</span>=<span class="str">https://graph.microsoft.com/.default</span></pre>
+    </div>
+    <p style="font-size:13px;color:#4b5563;margin-top:10px">The <code style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px">.default</code> scope means "everything the app has been granted in Azure AD" — no per-call scope juggling.</p>
+    <p style="font-size:12px;color:#9ca3af;margin-top:8px">Store these in Azure Key Vault or env vars in prod — never commit to Git.</p>
+  </div>
+
+  <!-- CHECKLIST -->
+  <div class="panel" id="p-checklist">
+    <div class="checklist">
+      <div class="ci"><div class="icon done">✓</div><div class="ci-text"><div class="head">Azure → App Registration → New registration</div><div class="note">Supported account type: "Accounts in this org directory only" — ties it to our Azure AD</div></div></div>
+      <div class="ci"><div class="icon done">✓</div><div class="ci-text"><div class="head">Platform: Single-page application (SPA)</div><div class="note">Add redirect URIs: <span class="cfg">http://localhost:3000</span> for dev + your prod domain with https</div></div></div>
+      <div class="ci"><div class="icon done">✓</div><div class="ci-text"><div class="head">Copy Client ID + Tenant ID</div><div class="note">Goes into <span class="cfg">msalInstance</span> config in React</div></div></div>
+      <div class="ci"><div class="icon done">✓</div><div class="ci-text"><div class="head">API Permissions → Add MS Graph</div><div class="note"><span class="cfg">User.Read</span> minimum; add <span class="cfg">GroupMember.Read.All</span> for group-based access</div></div></div>
+      <div class="ci"><div class="icon done">✓</div><div class="ci-text"><div class="head">Certificates &amp; Secrets → New client secret</div><div class="note">Backend only — copy once immediately, store securely</div></div></div>
+      <div class="ci"><div class="icon warn">!</div><div class="ci-text"><div class="head">Grant admin consent</div><div class="note">An Azure AD admin must click "Grant admin consent for [org]" — easy to miss</div></div></div>
+    </div>
+  </div>
+
+  <!-- GOTCHAS -->
+  <div class="panel" id="p-gotchas">
+    <div class="gotcha-grid">
+      <div class="gcard blue">
+        <div class="badge org">Our org</div>
+        <div class="gcard-body">
+          <div class="gh">Users sign in with their existing work account</div>
+          <div class="gb">Since we registered the app under our organisation's Azure AD, anyone in our directory can log in with the same work email and password they use every day. No new accounts, no separate credentials.</div>
+        </div>
+      </div>
+      <div class="gcard story">
+        <div class="badge story">Challenge</div>
+        <div class="gcard-body">
+          <div class="gh">Why did it work in dev but not in prod?</div>
+          <div class="team-quote">"Initially we didn't understand why it was working in dev but not working in prod."</div>
+          <div class="gb">Azure AD only accepts <span class="cfg">http://localhost</span> over plain HTTP — everything else must be HTTPS. In dev, localhost gets a special pass. In prod, we were using an IP address or a plain HTTP URL, which Azure silently rejects.</div>
+          <div class="url-row">
+            <span class="url-pill bad">http://192.168.1.10:3000</span>
+            <span class="url-pill bad">http://ourapp.com</span>
+            <span class="url-pill ok">https://ourapp.yourdomain.com</span>
+          </div>
+          <div class="resolution">
+            <div class="rl">How we fixed it</div>
+            <div class="rb">We resolved this by deploying the application under a domain with a valid SSL certificate, registering the corresponding <span class="cfg">https://</span> URL as the redirect URI in Azure AD.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHY -->
+  <div class="panel" id="p-why">
+    <div class="why-grid">
+      <div class="wcard"><div class="wh">Why SPA (not Web)?</div><div class="wb">SPA platform uses PKCE — no client secret in the browser. More secure for public clients like React apps.</div></div>
+      <div class="wcard"><div class="wh">Why <code style="font-family:monospace;font-size:11px">.default</code> scope?</div><div class="wb">Backend uses client credentials flow. <code style="font-family:monospace;font-size:11px">.default</code> requests everything pre-approved in Azure — cleaner than listing scopes.</div></div>
+      <div class="wcard"><div class="wh">Why only https in prod?</div><div class="wb">Azure AD enforces HTTPS on non-localhost URIs. It's also just good practice — tokens travel over this connection.</div></div>
+      <div class="wcard"><div class="wh">Why our org's tenant?</div><div class="wb">Users don't need new accounts. We get group membership and org data from our existing directory for free.</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const codeTexts = [
+  `import { PublicClientApplication } from '@azure/msal-browser';\nimport { MsalProvider } from '@azure/msal-react';\n\nconst msalInstance = new PublicClientApplication({\n  auth: {\n    clientId: 'YOUR_CLIENT_ID',\n    authority: 'https://login.microsoftonline.com/YOUR_TENANT_ID',\n    redirectUri: window.location.origin,\n  }\n});\n\nexport default function App() {\n  return (\n    <MsalProvider instance={msalInstance}>\n      <YourApp />\n    </MsalProvider>\n  );\n}`,
+  `graph.client-id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\ngraph.client-secret=your-secret-here\ngraph.tenant-id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\ngraph.scope=https://graph.microsoft.com/.default`
+];
+
+function show(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('p-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function copyCode(btn, idx) {
+  navigator.clipboard.writeText(codeTexts[idx]).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+</script>
+</body>
+</html>
